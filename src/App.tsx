@@ -21,76 +21,111 @@ import {
   translations,
 } from '@/translations';
 
-const THREAT_KEYWORDS: Record<string, string[]> = {
-  'Urgency / Phishing': ['urgent', 'bank', 'password', 'suspend', 'click here', 'verify your account', 'immediate action', 'account locked'],
-  'Gift Card / Payment': ['gift card', 'itunes', 'google play card', 'wire transfer', 'bitcoin', 'crypto', 'payment method'],
-  'Lottery / Prize': ['you have won', 'lottery', 'prize', 'claim your', 'congratulations you', 'winner'],
-  'Romance / Impersonation': ['i love you', 'send money', 'stranded', 'military', 'oil rig', 'widow', 'inheritance'],
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY as string;
+const GEMINI_MODEL = 'gemini-1.5-flash';
+const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+
+const LANG_CODE: Record<Language, string> = {
+  en: 'English',
+  hi: 'Hindi',
+  mr: 'Marathi',
 };
 
-const SUSPICIOUS_KEYWORDS = [
-  'limited time',
-  'act now',
-  'don\'t tell anyone',
-  'keep this confidential',
-  'wire',
-  'money order',
-  'prepaid',
-  'dear customer',
-  'dear user',
-  'confirm your identity',
-];
+function buildPrompt(text: string, lang: Language): string {
+  return `You are ScamShield, an expert fraud-detection assistant that helps seniors and families identify digital scams in messages (SMS, email, WhatsApp, social media, etc.).
 
-function analyzeThreat(text: string, lang: Language): Promise<AnalysisResult> {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      const t = translations[lang];
-      const lower = text.toLowerCase().trim();
+Analyze the following message and determine if it is a scam. Classify the threat level STRICTLY as one of: "Safe", "Suspicious", or "Dangerous".
 
-      if (lower.length === 0) {
-        resolve({
-          threat_level: 'Safe',
-          scam_type: t.safeScamType,
-          explanation: t.emptyExplanation,
-          action: t.emptyAction,
-        });
-        return;
-      }
+- "Dangerous": The message is very likely a scam (phishing, fraud, impersonation, extortion, fake prizes, etc.).
+- "Suspicious": The message has some red flags but is not clearly a scam.
+- "Safe": The message appears benign and legitimate.
 
-      for (const [scamType, keywords] of Object.entries(THREAT_KEYWORDS)) {
-        for (const kw of keywords) {
-          if (lower.includes(kw)) {
-            resolve({
-              threat_level: 'Dangerous',
-              scam_type: t.scamTypeNames[scamType],
-              explanation: t.dangerousExplanation(scamType),
-              action: t.dangerousAction,
-            });
-            return;
-          }
-        }
-      }
+Respond ONLY with a JSON object (no markdown, no extra text) in this exact format:
+{
+  "threat_level": "Safe" | "Suspicious" | "Dangerous",
+  "scam_type": "a short label for the type of scam or fraud, or 'None' if safe",
+  "explanation": "one single sentence explaining why you classified it this way",
+  "action": "one single sentence with a recommended action for the user"
+}
 
-      for (const kw of SUSPICIOUS_KEYWORDS) {
-        if (lower.includes(kw)) {
-          resolve({
-            threat_level: 'Suspicious',
-            scam_type: t.suspiciousScamType,
-            explanation: t.suspiciousExplanation,
-            action: t.suspiciousAction,
-          });
-          return;
-        }
-      }
+Write the "scam_type", "explanation", and "action" fields in ${LANG_CODE[lang]}.
 
-      resolve({
-        threat_level: 'Safe',
-        scam_type: t.safeScamType,
-        explanation: t.safeExplanation,
-        action: t.safeAction,
-      });
-    }, 1500);
+Message to analyze:
+"""
+${text}
+"""`;
+}
+
+function parseGeminiResponse(raw: string, lang: Language): AnalysisResult {
+  const t = translations[lang];
+  const cleaned = raw.replace(/```json/gi, '').replace(/```/g, '').trim();
+  const match = cleaned.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error('No JSON in Gemini response');
+
+  const parsed = JSON.parse(match[0]) as {
+    threat_level: string;
+    scam_type: string;
+    explanation: string;
+    action: string;
+  };
+
+  const level = (parsed.threat_level || '').trim().toLowerCase();
+  const threatLevel: ThreatLevel =
+    level === 'dangerous'
+      ? 'Dangerous'
+      : level === 'suspicious'
+        ? 'Suspicious'
+        : 'Safe';
+
+  return {
+    threat_level: threatLevel,
+    scam_type: parsed.scam_type || t.safeScamType,
+    explanation: parsed.explanation || t.safeExplanation,
+    action: parsed.action || t.safeAction,
+  };
+}
+
+async function analyzeThreat(text: string, lang: Language): Promise<AnalysisResult> {
+  const t = translations[lang];
+
+  if (text.trim().length === 0) {
+    return {
+      threat_level: 'Safe',
+      scam_type: t.safeScamType,
+      explanation: t.emptyExplanation,
+      action: t.emptyAction,
+    };
+  }
+
+  const res = await fetch(GEMINI_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': GEMINI_API_KEY,
+    },
+    body: JSON.stringify({
+      contents: [
+        {
+          parts: [{ text: buildPrompt(text, lang) }],
+        },
+      ],
+      generationConfig: {
+        temperature: 0.3,
+        maxOutputTokens: 300,
+        responseMimeType: 'application/json',
+      },
+    }),
   });
+
+  if (!res.ok) {
+    throw new Error(`Gemini API error: ${res.status}`);
+  }
+
+  const data = await res.json();
+  const raw: string =
+    data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+
+  return parseGeminiResponse(raw, lang);
 }
 
 function LanguageToggle({
@@ -334,10 +369,20 @@ function App() {
     if (userInput.trim().length === 0 || isLoading) return;
     setIsLoading(true);
     setAnalysisResult(null);
-    const result = await analyzeThreat(userInput, lang);
-    setAnalysisResult(result);
-    setIsLoading(false);
-  }, [userInput, isLoading, lang]);
+    try {
+      const result = await analyzeThreat(userInput, lang);
+      setAnalysisResult(result);
+    } catch {
+      setAnalysisResult({
+        threat_level: 'Safe',
+        scam_type: t.errorScamType,
+        explanation: t.errorExplanation,
+        action: t.errorAction,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [userInput, isLoading, lang, t]);
 
   const handleClear = useCallback(() => {
     setUserInput('');

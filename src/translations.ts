@@ -46,6 +46,10 @@ export interface Translation {
   safeScamType: string;
   safeExplanation: string;
   safeAction: string;
+  errorTitle: string;
+  errorScamType: string;
+  errorExplanation: string;
+  errorAction: string;
 }
 
 export const translations: Record<Language, Translation> = {
@@ -100,6 +104,10 @@ export const translations: Record<Language, Translation> = {
     safeScamType: 'None',
     safeExplanation: 'This message does not show obvious signs of a scam. No urgency tactics, requests for sensitive information, or suspicious links were detected.',
     safeAction: 'You can proceed, but always stay cautious. If something feels wrong, trust your instincts and ask a family member for help.',
+    errorTitle: 'Analysis Failed',
+    errorScamType: 'Error',
+    errorExplanation: 'We could not analyze your message right now. Please check your internet connection and try again.',
+    errorAction: 'If the problem persists, try again later or use your best judgment to evaluate the message.',
   },
   hi: {
     speechLang: 'hi-IN',
@@ -152,6 +160,10 @@ export const translations: Record<Language, Translation> = {
     safeScamType: 'कोई नहीं',
     safeExplanation: 'इस संदेश में धोखाधड़ी के स्पष्ट संकेत नहीं हैं। कोई तात्कालिकता की तरकीब, संवेदनशील जानकारी का अनुरोध, या संदिग्ध लिंक नहीं मिले।',
     safeAction: 'आप आगे बढ़ सकते हैं, लेकिन हमेशा सतर्क रहें। यदि कुछ गलत लगे, तो अपनी सेहत पर भरोसा करें और किसी परिवार के सदस्य से मदद लें।',
+    errorTitle: 'विश्लेषण विफल',
+    errorScamType: 'त्रुटि',
+    errorExplanation: 'हम अभी आपका संदेश विश्लेषित नहीं कर सके। कृपया अपना इंटरनेट कनेक्शन जांचें और पुनः प्रयास करें।',
+    errorAction: 'यदि समस्या बनी रहती है, तो बाद में पुनः प्रयास करें या संदेश का मूल्यांकन करने के लिए अपने विवेक का उपयोग करें।',
   },
   mr: {
     speechLang: 'mr-IN',
@@ -204,5 +216,9 @@ export const translations: Record<Language, Translation> = {
     safeScamType: 'काही नाही',
     safeExplanation: 'या संदेशात फसवणुकीचे स्पष्ट संकेत नाहीत. कोणतीही तात्काळिकतेची युक्ती, संवेदनशील माहितीची मागणी, किंवा संशयास्पद लिंक सापडले नाहीत.',
     safeAction: 'तुम्ही पुढे जाऊ शकता, पण नेहमी सतर्क रहा. जर काही वाईट वाटले, तर आपल्या अंतर्मनावर विश्वास ठेवा आणि कुटुंबातील सदस्याकडून मदत घ्या.',
+    errorTitle: 'विश्लेषण अयशस्वी',
+    errorScamType: 'त्रुटी',
+    errorExplanation: 'आम्ही आत्ता तुमचा संदेश विश्लेषित करू शकलो नाही. कृपया तुमचे इंटरनेट कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.',
+    errorAction: 'जर समस्या टिकून राहिली, तर नंतर पुन्हा प्रयत्न करा किंवा संदेशाचे मूल्यमापन करण्यासाठी तुमच्या विवेकाचा वापर करा.',
   },
 };
